@@ -4,6 +4,8 @@
 
 
 import ocsf.server.*;
+import common.*;
+import java.io.*;
 
 /**
  * This class overrides some of the methods in the abstract 
@@ -23,6 +25,7 @@ public class EchoServer extends AbstractServer
    * The default port to listen on.
    */
   final public static int DEFAULT_PORT = 5555;
+  ChatIF serverUI;
   
   //Constructors ****************************************************
   
@@ -34,6 +37,12 @@ public class EchoServer extends AbstractServer
   public EchoServer(int port) 
   {
     super(port);
+  }
+  
+  public EchoServer(int port, ChatIF sUI) throws IOException
+  {
+    super(port);
+    this.serverUI = sUI;
   }
 
   
@@ -48,8 +57,96 @@ public class EchoServer extends AbstractServer
   public void handleMessageFromClient
     (Object msg, ConnectionToClient client)
   {
-    System.out.println("Message received: " + msg + " from " + client);
-    this.sendToAllClients(msg);
+	  if((boolean)(client.getInfo("isFirstMessage"))){
+			
+		  String[] msg_ = (String.valueOf(msg)).split(" ", 2);
+			if(msg_[0].equals("#login")){
+				client.setInfo("loginID", msg_[1]);
+			}
+			else{
+				try{
+					client.sendToClient("You are not loged in");
+					client.close();
+				}
+				catch(IOException e){
+				}
+			}
+		}
+		else{
+			if((String.valueOf(msg)).startsWith("#login")){
+				try{
+					client.sendToClient("You are already loged in");
+				}
+				catch(IOException e){
+				}
+			}
+			System.out.println("Message received: " + msg + " from " + client.getInfo("loginID"));
+		    this.sendToAllClients(String.valueOf(client.getInfo("loginID"))+ ": "+ msg);
+		}
+  }
+  
+  public void handleMessageFromServerUI(String message)
+  {
+    if (message.startsWith("#"))
+    {
+    	handleCommand(message);
+    }
+    else
+    {
+      // send message to clients
+      serverUI.display(message);
+      this.sendToAllClients("SERVER MSG> " + message);
+    }
+  }
+  
+  private void handleCommand(String command) {
+	  if(command.equals("#quit")) {
+		  serverUI.display("BYE!");
+		  quit();
+	  }
+	  else if(command.toLowerCase().equals("#stop")) {
+		  stopListening();
+	  }
+	  else if(command.toLowerCase().equals("#close")) {
+		  try
+	      {
+	        close();
+	      }
+	      catch(IOException e) {}
+	  }
+	  else if(command.toLowerCase().startsWith("#setport")) {
+		  if (!isListening() && getNumberOfClients() == 0)
+	      {
+	        int newPort = Integer.parseInt(command.substring(9));
+	        setPort(newPort);
+	        serverUI.display
+	          ("Server port changed to " + getPort());
+	      }
+	      else
+	      {
+	        serverUI.display
+	          ("The server must be closed.");
+	      }
+	  }
+	  else if(command.toLowerCase().equals("#getport")) {
+		  serverUI.display("Current port is: " + getPort());
+	  }
+	  else if (command.equalsIgnoreCase("#start")){
+	      if (!isListening()){
+	    	  try{
+	    		  listen();
+	    		 }
+	        catch(Exception ex){
+	        	serverUI.display("Error - Could not listen for clients!");
+	        	}
+	      }
+	      else{
+	    	  serverUI.display
+	    	  ("The server is already listening for clients.");
+	      }
+	    }
+	  else
+		  serverUI.display("The command does not exist.");
   }
     
   /**
@@ -70,6 +167,40 @@ public class EchoServer extends AbstractServer
   {
     System.out.println
       ("Server has stopped listening for connections.");
+  }
+  @Override
+  /**
+   * Implementation of hook method called each time a new client connection is
+   * accepted. The default implementation does nothing.
+   * @param client the connection connected to the client.
+   */
+  protected void clientConnected(ConnectionToClient client) {
+	  System.out.println
+      ("Client connected.");
+  }
+  @Override
+  /**
+   * Implementation of hook method called each time a client disconnects.
+   * The default implementation does nothing. The method
+   * may be overridden by subclasses but should remains synchronized.
+   *
+   * @param client the connection with the client.
+   */
+  synchronized protected void clientDisconnected(ConnectionToClient client) {
+	  System.out.println
+      ("Client disconnected.");
+  }
+  
+  public void quit()
+  {
+    try
+    {
+      close();
+    }
+    catch(IOException e)
+    {
+    }
+    System.exit(0);
   }
   
   //Class methods ***************************************************

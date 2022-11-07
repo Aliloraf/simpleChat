@@ -38,12 +38,13 @@ public class ChatClient extends AbstractClient
    * @param clientUI The interface type variable.
    */
   
-  public ChatClient(String host, int port, ChatIF clientUI) 
+  public ChatClient(String loginID, String host, int port, ChatIF clientUI) 
     throws IOException 
   {
     super(host, port); //Call the superclass constructor
     this.clientUI = clientUI;
     openConnection();
+    this.sendToServer("#login " + loginID);
   }
 
   
@@ -66,9 +67,12 @@ public class ChatClient extends AbstractClient
    */
   public void handleMessageFromClientUI(String message)
   {
-    try
-    {
-      sendToServer(message);
+    try{
+    	if (message.startsWith("#")) {
+    		handleCommand(message);
+    	}
+    	else
+    		sendToServer(message);
     }
     catch(IOException e)
     {
@@ -76,6 +80,63 @@ public class ChatClient extends AbstractClient
         ("Could not send message to server.  Terminating client.");
       quit();
     }
+  }
+  
+  private void handleCommand(String command) {
+	  if(command.equals("#quit")) {
+		  clientUI.display("BYE!");
+		  quit();
+	  }
+	  else if(command.toLowerCase().equals("#logoff")) {
+		  try {
+			  if(this.isConnected()) {
+				  this.closeConnection();
+			  }
+			  else
+				  clientUI.display("Client is already disconnected.");
+			
+		} catch (IOException e) {
+			clientUI.display("An error has occured.");
+		}
+	  }
+	  else if(command.toLowerCase().equals("#logoin")) {
+		  try {
+			  if(this.isConnected()) {
+				  clientUI.display("Client is already disconnected.");
+			  }
+			  else
+				  this.openConnection();
+			
+		} catch (IOException e) {
+			clientUI.display("An error has occured.");
+		}
+	  }
+	  else if(command.toLowerCase().startsWith("#sethost")) {
+		  if (this.isConnected()) {
+			  clientUI.display("Client needs to be disconected to set host.");
+		  }
+		  else {
+			  this.setHost(command.substring(9));
+			  clientUI.display("Host changed to: "+getHost());
+		  }
+	  }
+	  else if(command.toLowerCase().startsWith("#setport")) {
+		  if (this.isConnected()) {
+			  clientUI.display("Client needs to be disconected to set port.");
+		  }
+		  else {
+			  this.setPort(Integer.parseInt(command.substring(9)));
+			  clientUI.display("Port changed to: "+getPort());
+		  }
+	  }
+	  else if(command.toLowerCase().equals("#gethost")) {
+		  clientUI.display("Current host is: " + getHost());
+	  }
+	  else if(command.toLowerCase().equals("#getport")) {
+		  clientUI.display("Current port is: " + getPort());
+	  }
+	  else
+		  clientUI.display("The command does not exist.");
   }
   
   /**
@@ -90,5 +151,31 @@ public class ChatClient extends AbstractClient
     catch(IOException e) {}
     System.exit(0);
   }
+  
+  @Override
+  /**
+	 * Implementation of hook method called after the connection has been closed. The default
+	 * implementation does nothing. The method may be overriden by subclasses to
+	 * perform special processing such as cleaning up and terminating, or
+	 * attempting to reconnect.
+	 */
+  protected void connectionClosed() {
+	  clientUI.display("The connection has been closed");
+  }
+  
+  @Override
+	/**
+	 * Implementation of hook method called each time an exception is thrown by the client's
+	 * thread that is waiting for messages from the server. The method may be
+	 * overridden by subclasses.
+	 * 
+	 * @param exception
+	 *            the exception raised.
+	 */
+  protected void connectionException(Exception exception) {
+	  clientUI.display("The server has shut down");
+	  System.exit(0);
+  }
+  
 }
 //End of ChatClient class
